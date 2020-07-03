@@ -31,12 +31,11 @@ def get_medal_times(url, medal_names):
     return data
 
 
-def get_custom_tracks(data):
+def get_custom_tracks(data, url):
     print("Getting custom tracks")
     custom_tracks = ["F01-Race.Gbx", "F03-Obstacle.Gbx", "F05-Endurance.Gbx",
                      "F07-Race.Gbx", "F09-Speed.Gbx", "F11-Race.Gbx",
                      "F13-Race.Gbx", "F15-Endurance.Gbx"]
-    url="https://sites.google.com/site/trackmaniachampionnat/archive/"
     medal_names = ["bronze", "silver", "gold", "authortime"]
     # ctracks = dict()
     # medals = ["br
@@ -79,8 +78,12 @@ def milliseconds_to_string(milliseconds):
             duration = duration[:-3]
         return duration
 
-def make_ghost_file_name(url="https://sites.google.com/site/trackmaniachampionnat/archive/", key="", player="", suffix=".gbx"):
+# def make_ghost_file_name(url="https://sites.google.com/site/trackmaniachampionnat/archive/", key="", player="", suffix=".gbx"):
+#     return "{}{}-{}{}".format(url, key, player, suffix)
+
+def make_ghost_file_name(key="", player="", suffix=".gbx", url=""):
     return "{}{}-{}{}".format(url, key, player, suffix)
+
 
 
 def extract_time_from_file(file_url):
@@ -95,15 +98,17 @@ def extract_time_from_file(file_url):
     return time
 
 
-def get_player_times(players, data, medal_names):
+def get_player_times(players, data, medal_names, base_url):
     for p in players.keys():
         print("Getting times for player: {}".format(p))
         for key in data.keys():
-            ghost_url = make_ghost_file_name(key=key, player=p)
-            time = extract_time_from_file(ghost_url)
+            suffix = ".gbx"
+            # ghost_url = make_ghost_file_name(key=key, player=p, suffix=suffix, url=base_url)
+            time = extract_time_from_file(make_ghost_file_name(key=key, player=p, suffix=suffix, url=base_url))
             if time is None:
-                ghost_url = make_ghost_file_name(key=key, player=p, suffix=".Gbx")
-                time = extract_time_from_file(ghost_url)
+                suffix = ".Gbx"
+                # ghost_url = make_ghost_file_name(key=key, player=p, suffix=suffix, url=base_url)
+                time = extract_time_from_file(make_ghost_file_name(key=key, player=p, suffix=suffix, url=base_url))
             if time is not None:
                 data[key][p] = dict()
                 data[key][p]["time"] = time
@@ -116,7 +121,7 @@ def get_player_times(players, data, medal_names):
                     if time < data[key][n]:
                         nmedals += 1
                 data[key][p]["medals"] = nmedals
-                data[key][p]["url"] = ghost_url
+                data[key][p]["url"] = make_ghost_file_name(key=key, player=p, suffix=suffix)
                 print("  - {} : {}".format(key, time))
     return
 
@@ -204,11 +209,13 @@ def create_race_plots(players, data):
 #===============================================================================
 
 standalone = False
-
 fetch_new_ghosts = False
+base_url = "https://sites.google.com/site/trackmaniachampionnat/archive/"
+
 
 # Define players
 player_names = ["Baptiste", "Neil", "Olivier", "Jacques", "Seb", "Baba", "Chris"]
+# player_names = ["Baptiste"]
 
 players = dict()
 for p in player_names:
@@ -233,8 +240,8 @@ image_url = medal_url + "images/"
 if fetch_new_ghosts:
     # Start by getting all the medal times
     data = get_medal_times(medal_url, medal_names)
-    get_custom_tracks(data)
-    get_player_times(players, data, medal_names)
+    get_custom_tracks(data, base_url)
+    get_player_times(players, data, medal_names, base_url)
     # Save
     np.save('my_dict.npy', data)
 else:
@@ -249,6 +256,8 @@ if standalone:
     outputHTML += "<html>\n"
     outputHTML += "<head>\n"
     outputHTML += "<title>Trackmania Championnat</title>\n"
+outputHTML += "<base href=\"{}\">\n".format(base_url)
+
 outputHTML += "<style>\n"
 # outputHTML += "tr {border:4px solid transparent;}\n"
 # outputHTML += "tr:nth-child(odd) {background-color: #999999;}\n"
@@ -262,7 +271,8 @@ outputHTML += "tr:hover a {color: #000000 !important;}\n"
 for n, p in players.items():
     outputHTML += ".{} {{ background-color: {} }}\n".format(n, p["color"])
     outputHTML += ".record{} {{ background: radial-gradient({}, #000000); }}\n".format(n, p["color"])
-outputHTML += ".fontRecord {{font-weight: bold;}}\n"
+outputHTML += ".fontRecord {font-weight: bold;}\n"
+outputHTML += ".boldCenter {font-weight: bold; text-align: center;}\n"
 outputHTML += "</style>\n"
 if standalone:
     outputHTML += "</head>\n"
@@ -270,27 +280,28 @@ if standalone:
 # outputHTML += "<div style=\"background-color:{};\">".format(bckgrnd)
 outputHTML += "<div>"
 # outputHTML += "<table border=\"0\" style=\"border-spacing: 10px 1px; font-family: Courier New;\"><th style=\"background-color: {};\"></th>".format(bckgrnd)
-outputHTML += "<table border=\"0\" style=\"border-spacing: 10px 1px; font-family: Courier New;\"><th></th>"
+outputHTML += "<table border=\"0\" style=\"border-spacing: 10px 1px; font-family: Courier New;\">\n<th></th>\n"
 for p in players.keys():
     # outputHTML += "<th class=\"{}\" style=\"color: #000000;\">{}</th>".format(p, p);
-    outputHTML += "<th class=\"{}\">{}</th>".format(p, p);
+    outputHTML += "<th class=\"{}\">{}</th>\n".format(p, p);
 current_group = "Z"
 for race_count, key in enumerate(data.keys()):
     if current_group != key[0]:
         current_group = key[0]
         # outputHTML += "<tr><td colspan=\"" + str(len(player_names) + 1) + "\" style=\"background-color: " + bckgrnd + ";\">&nbsp;</td></tr><tr style=\"background-color: " + race_groups[current_group] + ";\"><td colspan=\"" + str(len(player_names) + 1) + "\""
-        outputHTML += "<tr><td colspan=\"" + str(len(player_names) + 1) + "\">&nbsp;</td></tr><tr><td colspan=\"" + str(len(player_names) + 1) + "\" style=\"background-color: " + race_groups[current_group] + ";"
+        outputHTML += "<tr>\n<td colspan=\"" + str(len(player_names) + 1) + "\">&nbsp;</td>\n</tr>\n<tr>\n<td colspan=\"" + str(len(player_names) + 1) + "\" style=\"background-color: " + race_groups[current_group] + ";"
         if race_groups[current_group] in ["White", "Yellow"]:
-            outputHTML += " color: black;\""
-        outputHTML += "\">" + race_groups[current_group] + "</td>\n"
-    outputHTML += "<tr><td>" + key + "</td>"
+            outputHTML += " color: black;"
+        outputHTML += "\">" + race_groups[current_group] + "</td>\n</tr>\n"
+    outputHTML += "<tr>\n<td>" + key + "</td>\n"
     for p in players.keys():
         # bg_color = make_color(players[p]["color"])#, -1.0 * (race_count % 2 == 0))
         bg_color = players[p]["color"]#)#, -1.0 * (race_count % 2 == 0))
+        outputHTML += "<td class=\""
         if p in data[key].keys():
             players[p]["medals"] += data[key][p]["medals"]
             # outputHTML += "<td style=\""# + bg_color
-            outputHTML += "<td class=\""# + bg_color
+            # outputHTML += "<td class=\""# + bg_color
             if data[key][p]["time"] == data[key]["fastest_time"]:
                 # outputHTML += "background: repeating-linear-gradient(45deg, " + bg_color + ", " + bg_color + " 10px, " + record_color + " 10px, " + record_color + " 20px);"
                 # outputHTML += "background: radial-gradient(" + bg_color + ", #000000);"
@@ -298,20 +309,21 @@ for race_count, key in enumerate(data.keys()):
                 # outputHTML += record_color
                 players[p]["records"] += 1
                 # afont = "style=\"font-weight: bold;\""
-                afont = "class=\"fontRecord\""
+                afont = "class=\"fontRecord\" "
             else:
                 # outputHTML += "background-color: " + bg_color + ";"
                 afont = ""
             outputHTML += p + "\"><a " + afont + "href=\"" + data[key][p]["url"] + "\">" + milliseconds_to_string(data[key][p]["time"]) + "</a>"
             if data[key][p]["medals"] > 0:
                 outputHTML += "&nbsp;<img src=\"" + image_url + medal_names[data[key][p]["medals"] - 1] + ".png\" />"
-            outputHTML += "</td>"
+            outputHTML += "</td>\n"
         else:
-            outputHTML += "<td style=\"background-color: " + bg_color + ";\"></td>"
+            # outputHTML += "<td style=\"background-color: " + bg_color + ";\"></td>"
+            outputHTML += "{}\"></td>\n".format(p)
 
     outputHTML += "</tr>\n"
 # outputHTML += "<tr><td colspan=\"" + str(len(player_names) + 1) + "\" style=\"background-color: {};\">&nbsp;</td></tr>\n".format(bckgrnd)
-outputHTML += "<tr><td colspan=\"" + str(len(player_names) + 1) + "\">&nbsp;</td></tr>\n"
+outputHTML += "<tr>\n<td colspan=\"" + str(len(player_names) + 1) + "\">&nbsp;</td>\n</tr>\n"
 
 # Count medals and records
 max_medals = 0
@@ -324,16 +336,20 @@ titles = ["medals", "records"]
 maxval = [max_medals, max_records]
 
 for t, m in zip(titles, maxval):
-    outputHTML += "<tr><td style=\"font-weight: bold;\">" + t.capitalize()[:-1] + " count</td>"
+    # outputHTML += "<tr><td style=\"font-weight: bold;\">" + t.capitalize()[:-1] + " count</td>"
+    outputHTML += "<tr>\n<td class=\"fontRecord\">" + t.capitalize()[:-1] + " count</td>\n"
     for p in players.keys():
-        outputHTML += "<td style=\"font-weight: bold; text-align: center; "
+        # outputHTML += "<td style=\"font-weight: bold; text-align: center; "
+        outputHTML += "<td class=\""
         # bg_color = make_color(players[p]["color"])
-        bg_color = players[p]["color"]
+        # bg_color = players[p]["color"]
         if players[p][t] == m:
-            outputHTML += "background: radial-gradient(" + bg_color + ", #000000)"
-        else:
-            outputHTML += "background-color: " + bg_color
-        outputHTML += ";\">" + str(players[p][t]) + "</td>"
+            # outputHTML += "background: radial-gradient(" + bg_color + ", #000000)"
+            outputHTML += "record"
+        # else:
+        #     outputHTML += "background-color: " + bg_color
+        # outputHTML += p + "\" style=\"font-weight: bold; text-align: center;\">" + str(players[p][t]) + "</td>"
+        outputHTML += p + " boldCenter\">" + str(players[p][t]) + "</td>\n"
     outputHTML += "</tr>\n"
 
 outputHTML += "</table>\n"
